@@ -131,8 +131,16 @@ h1, h2, p { margin-top: 0; }
 .message { max-width: 75%; padding: 11px 13px 8px; border: 1px solid #e9eef5; border-radius: 3px 12px 12px; background: #fff; }
 .message.mine { align-self: flex-end; border-color: var(--accent-border); border-radius: 12px 3px 12px 12px; background: var(--accent-soft); }
 .message p { margin: 0; color: #46546b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.message-reply-quote { display: grid; gap: 3px; margin-bottom: 8px; padding: 6px 8px; border-left: 2px solid var(--accent); border-radius: 3px; background: #f7f8fa; }
+.message-reply-quote strong, .replying-to strong { color: var(--accent); font-size: 10px; }
+.message-reply-quote span, .replying-to span { overflow: hidden; color: #748199; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .message-author { display: block; margin-bottom: 5px; color: var(--accent); font-size: 10px; }
 .message time { display: block; margin-top: 5px; color: #9ba6b5; text-align: right; font-size: 9px; }
+.reply-button { display: block; margin: 5px 0 0 auto; padding: 2px 0; border: 0; color: var(--accent); background: transparent; font-size: 9px; font-weight: 600; }
+.reply-button:disabled { cursor: not-allowed; opacity: .5; }
+.replying-to { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid #edf1f6; background: #fff8f8; }
+.replying-to > div { display: grid; min-width: 0; gap: 3px; }
+.replying-to button { flex: none; width: 25px; height: 25px; border: 0; border-radius: 50%; color: #748199; background: transparent; font-size: 18px; }
 .message-form { display: flex; gap: 10px; padding: 13px; border-top: 1px solid #edf1f6; }
 .message-form input { height: 41px; padding: 0 13px; border: 1px solid #e8edf4; border-radius: 7px; }
 .send-button { width: 42px; flex: none; border: 0; border-radius: 7px; color: #fff; background: var(--accent); font-size: 19px; }
@@ -245,6 +253,11 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .messages { background: #151a21; }
 :root[data-theme="dark"] .message { color: #e7eaf0; background: #202731; border-color: #35404d; }
 :root[data-theme="dark"] .message.mine { background: #351c21; border-color: #693039; }
+:root[data-theme="dark"] .message-reply-quote { background: #181e26; }
+:root[data-theme="dark"] .message-reply-quote span,
+:root[data-theme="dark"] .replying-to span { color: #aab3c1; }
+:root[data-theme="dark"] .replying-to { background: #211a1e; border-color: #303945; }
+:root[data-theme="dark"] .replying-to button { color: #aab3c1; }
 :root[data-theme="dark"] .message-author { color: #ff858d; }
 :root[data-theme="dark"] .account-create-fields input:focus,
 :root[data-theme="dark"] .account-controls input:focus { border-color: var(--accent); outline-color: var(--accent-focus); }

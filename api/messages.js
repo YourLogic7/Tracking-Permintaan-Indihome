@@ -23,7 +23,7 @@ export default api(async (req, res) => {
 
   if (req.method === "GET") {
     const recent = await messages
-      .find({}, { projection: { senderId: 1, username: 1, text: 1, createdAt: 1 } })
+      .find({}, { projection: { senderId: 1, username: 1, text: 1, createdAt: 1, replyTo: 1 } })
       .sort({ createdAt: -1, _id: -1 })
       .limit(50)
       .toArray();
@@ -34,16 +34,34 @@ export default api(async (req, res) => {
         username: message.username,
         text: message.text,
         createdAt: message.createdAt,
+        replyTo: message.replyTo,
       })),
     });
   }
 
   if (req.method !== "POST") return methodNotAllowed(res, ["GET", "POST", "DELETE"]);
 
-  const { text: rawText } = readBody(req);
+  const { text: rawText, replyToId } = readBody(req);
   const text = typeof rawText === "string" ? rawText.trim() : "";
   if (!text || text.length > 1000) {
     return sendJson(res, 400, { error: "Pesan harus terdiri dari 1–1000 karakter." });
+  }
+
+  let replyTo;
+  if (replyToId !== undefined) {
+    if (typeof replyToId !== "string" || !ObjectId.isValid(replyToId)) {
+      return sendJson(res, 400, { error: "Pesan yang dibalas tidak valid." });
+    }
+    const repliedMessage = await messages.findOne(
+      { _id: new ObjectId(replyToId) },
+      { projection: { username: 1, text: 1 } },
+    );
+    if (!repliedMessage) return sendJson(res, 404, { error: "Pesan yang dibalas tidak ditemukan." });
+    replyTo = {
+      id: repliedMessage._id.toString(),
+      username: repliedMessage.username,
+      text: repliedMessage.text,
+    };
   }
 
   const message = {
@@ -51,6 +69,7 @@ export default api(async (req, res) => {
     username: session.username,
     text,
     createdAt: new Date(),
+    ...(replyTo ? { replyTo } : {}),
   };
   const result = await messages.insertOne(message);
   return sendJson(res, 201, {

@@ -47,6 +47,7 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [chatError, setChatError] = useState("");
   const [draft, setDraft] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null);
   const [sending, setSending] = useState(false);
   const [clearingChat, setClearingChat] = useState(false);
   const messagesRequestId = useRef(0);
@@ -180,6 +181,7 @@ function App() {
       if (!response.ok) throw new Error(data.error || "Tidak dapat masuk.");
       setUser(data.user);
       setMessages([]);
+      setReplyingTo(null);
       setChatError("");
       setAdminError("");
       setAdminNotice("");
@@ -263,12 +265,13 @@ function App() {
       const response = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, ...(replyingTo ? { replyToId: replyingTo.id } : {}) }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Pesan tidak dapat dikirim.");
       setMessages((current) => [...current, data.message]);
       setDraft("");
+      setReplyingTo(null);
     } catch (requestError) {
       setChatError(requestError.message);
     } finally {
@@ -288,6 +291,7 @@ function App() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Riwayat chat tidak dapat dihapus.");
       setMessages([]);
+      setReplyingTo(null);
     } catch (requestError) {
       setChatError(requestError.message);
     } finally {
@@ -303,6 +307,7 @@ function App() {
       setUser(null);
       setPage("about");
       setMessages([]);
+      setReplyingTo(null);
       setChatError("");
       setAdminError("");
       setAdminNotice("");
@@ -500,12 +505,35 @@ function App() {
                 {messages.map((message) => (
                   <div key={message.id} className={message.senderId === user?.id ? "message mine" : "message"}>
                     {message.senderId !== user?.id && <strong className="message-author">{message.username}</strong>}
+                    {message.replyTo && (
+                      <div className="message-reply-quote">
+                        <strong>{message.replyTo.username}</strong>
+                        <span>{message.replyTo.text}</span>
+                      </div>
+                    )}
                     <p>{message.text}</p>
                     <time>{new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</time>
+                    <button
+                      className="reply-button"
+                      type="button"
+                      onClick={() => setReplyingTo(message)}
+                      disabled={clearingChat || sending}
+                    >
+                      Balas
+                    </button>
                   </div>
                 ))}
               </div>
               {chatError && <p className="form-error chat-error" role="alert">{chatError}</p>}
+              {replyingTo && (
+                <div className="replying-to">
+                  <div>
+                    <strong>Membalas {replyingTo.username}</strong>
+                    <span>{replyingTo.text}</span>
+                  </div>
+                  <button type="button" onClick={() => setReplyingTo(null)} aria-label="Batalkan balasan">×</button>
+                </div>
+              )}
               <form className="message-form" onSubmit={sendMessage}>
                 <input
                   aria-label="Tulis pesan"
@@ -514,7 +542,7 @@ function App() {
                   onChange={(event) => setDraft(event.target.value)}
                   maxLength={1000}
                 />
-                <button className="send-button" type="submit" aria-label="Kirim pesan" disabled={sending || !draft.trim()}>↑</button>
+                <button className="send-button" type="submit" aria-label="Kirim pesan" disabled={sending || clearingChat || !draft.trim()}>↑</button>
               </form>
             </div>
             <p className="chat-disclaimer">Pesan disimpan di MongoDB. Percakapan diperbarui otomatis setiap beberapa detik.</p>
