@@ -23,10 +23,20 @@ export default api(async (req, res) => {
 
   if (req.method === "GET") {
     const recent = await messages
-      .find({}, { projection: { senderId: 1, username: 1, text: 1, createdAt: 1, replyTo: 1 } })
+      .find({}, { projection: { senderId: 1, username: 1, text: 1, createdAt: 1, replyTo: 1, readBy: 1 } })
       .sort({ createdAt: -1, _id: -1 })
       .limit(50)
       .toArray();
+    if (recent.length) {
+      await messages.updateMany(
+        {
+          _id: { $in: recent.map((message) => message._id) },
+          senderId: { $ne: session.userId },
+          readBy: { $ne: session.userId },
+        },
+        { $addToSet: { readBy: session.userId } },
+      );
+    }
     return sendJson(res, 200, {
       messages: recent.reverse().map((message) => ({
         id: message._id.toString(),
@@ -35,6 +45,7 @@ export default api(async (req, res) => {
         text: message.text,
         createdAt: message.createdAt,
         replyTo: message.replyTo,
+        isRead: (message.readBy || []).some((userId) => userId !== message.senderId),
       })),
     });
   }

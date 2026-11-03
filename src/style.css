@@ -136,6 +136,7 @@ h1, h2, p { margin-top: 0; }
 .message-reply-quote span, .replying-to span { overflow: hidden; color: #748199; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .message-author { display: block; margin-bottom: 5px; color: var(--accent); font-size: 10px; }
 .message time { display: block; margin-top: 5px; color: #9ba6b5; text-align: right; font-size: 9px; }
+.message-read-status { display: block; margin-top: 3px; color: #748199; text-align: right; font-size: 9px; }
 .reply-button { display: block; margin: 5px 0 0 auto; padding: 2px 0; border: 0; color: var(--accent); background: transparent; font-size: 9px; font-weight: 600; }
 .reply-button:disabled { cursor: not-allowed; opacity: .5; }
 .replying-to { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid #edf1f6; background: #fff8f8; }
@@ -234,6 +235,7 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .privacy-note,
 :root[data-theme="dark"] .chat-contact small,
 :root[data-theme="dark"] .message time,
+:root[data-theme="dark"] .message-read-status,
 :root[data-theme="dark"] .accounts-empty,
 :root[data-theme="dark"] .account-identity small,
 :root[data-theme="dark"] .admin-entry { color: #9da8b8; }
