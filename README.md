@@ -14,7 +14,8 @@ npm run dev
 ## Backend chat
 
 - Buat database MongoDB Atlas dan siapkan connection string.
-- Tambahkan `MONGODB_URI`, `MONGODB_DB` (misalnya `infopermintaan`), `SESSION_SECRET`, dan `ADMIN_PASSWORD` di pengaturan environment variables Vercel. `SESSION_SECRET` harus acak dan minimal 32 karakter; `ADMIN_PASSWORD` minimal 16 karakter dan sebaiknya berupa password acak yang kuat. Jangan masukkan kredensial ke Git.
+- Tambahkan `MONGODB_URI`, `MONGODB_DB` (misalnya `infopermintaan`), `SESSION_SECRET`, dan `ADMIN_PASSWORD` di pengaturan environment variables Vercel. `SESSION_SECRET` harus acak dan minimal 32 karakter; `ADMIN_PASSWORD` minimal 8 karakter. Untuk keamanan, gunakan password yang kuat dan jangan masukkan kredensial ke Git.
+- Pastikan `ADMIN_PASSWORD` dan `SESSION_SECRET` diaktifkan untuk environment deployment yang sedang dibuka (Production, Preview, atau Development), lalu redeploy setelah mengubah nilainya.
 - Deploy proyek ke Vercel. Endpoint API ada di `api/`; akun dibuat dari dialog chat. Kata sandi disimpan sebagai hash, dan sesi menggunakan cookie HttpOnly.
 - Tautan **Mode admin** ada di halaman Tentang Kami. Masuk dengan `ADMIN_PASSWORD` untuk membuat akun, mereset kata sandi, atau menghapus akun pengguna. Reset kata sandi dan penghapusan akun mencabut akses sesi chat lama. Akses admin dijaga backend, bukan hanya tampilan frontend.
 - Semua pengguna terdaftar melihat ruang chat yang sama. Pesan tersimpan di koleksi `messages`, dan antarmuka memeriksa pesan baru setiap 4 detik.

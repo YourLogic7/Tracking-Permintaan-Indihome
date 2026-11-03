@@ -1,7 +1,14 @@
-import { api, methodNotAllowed, readBody, sendJson, setSession, verifyAdminPassword } from "../../lib/server.js";
+import { api, getAdminConfigurationError, methodNotAllowed, readBody, sendJson, setSession, verifyAdminPassword } from "../../lib/server.js";
 
 export default api(async (req, res) => {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
+
+  const configurationError = getAdminConfigurationError();
+  if (configurationError) {
+    return sendJson(res, 503, {
+      error: `${configurationError} Atur Environment Variables pada environment deployment yang aktif, lalu redeploy.`,
+    });
+  }
 
   const { password } = readBody(req);
   if (typeof password !== "string" || !verifyAdminPassword(password)) {
