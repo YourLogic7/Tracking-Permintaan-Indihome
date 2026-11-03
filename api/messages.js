@@ -16,6 +16,11 @@ export default api(async (req, res) => {
   if (!account || (account.authVersion || 0) !== session.authVersion) {
     return sendJson(res, 401, { error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
   }
+  if (req.method === "DELETE") {
+    const result = await messages.deleteMany({});
+    return sendJson(res, 200, { ok: true, deletedCount: result.deletedCount });
+  }
+
   if (req.method === "GET") {
     const recent = await messages
       .find({}, { projection: { senderId: 1, username: 1, text: 1, createdAt: 1 } })
@@ -33,7 +38,7 @@ export default api(async (req, res) => {
     });
   }
 
-  if (req.method !== "POST") return methodNotAllowed(res, ["GET", "POST"]);
+  if (req.method !== "POST") return methodNotAllowed(res, ["GET", "POST", "DELETE"]);
 
   const { text: rawText } = readBody(req);
   const text = typeof rawText === "string" ? rawText.trim() : "";

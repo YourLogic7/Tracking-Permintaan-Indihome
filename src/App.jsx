@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const outcomes = [
   {
@@ -48,6 +48,8 @@ function App() {
   const [chatError, setChatError] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [clearingChat, setClearingChat] = useState(false);
+  const messagesRequestId = useRef(0);
   const [accounts, setAccounts] = useState([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [accountPasswords, setAccountPasswords] = useState({});
@@ -90,16 +92,17 @@ function App() {
 
     let active = true;
     async function loadMessages() {
+      const requestId = ++messagesRequestId.current;
       try {
         const response = await fetch("/api/messages");
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Pesan tidak dapat dimuat.");
-        if (active) {
+        if (active && requestId === messagesRequestId.current) {
           setMessages(data.messages);
           setChatError("");
         }
       } catch (requestError) {
-        if (active) setChatError(requestError.message);
+        if (active && requestId === messagesRequestId.current) setChatError(requestError.message);
       }
     }
 
@@ -118,14 +121,14 @@ function App() {
       }
     }
 
-    if (page === "chat") loadMessages();
-    else loadAccounts();
-    const timer = page === "chat" ? window.setInterval(loadMessages, 4000) : null;
+    if (page === "chat" && !clearingChat) loadMessages();
+    else if (page === "admin") loadAccounts();
+    const timer = page === "chat" && !clearingChat ? window.setInterval(loadMessages, 4000) : null;
     return () => {
       active = false;
       if (timer) window.clearInterval(timer);
     };
-  }, [page]);
+  }, [page, clearingChat]);
 
   function checkRequest(event) {
     event.preventDefault();
@@ -253,7 +256,7 @@ function App() {
   async function sendMessage(event) {
     event.preventDefault();
     const text = draft.trim();
-    if (!text || sending) return;
+    if (!text || sending || clearingChat) return;
     setSending(true);
     setChatError("");
     try {
@@ -270,6 +273,25 @@ function App() {
       setChatError(requestError.message);
     } finally {
       setSending(false);
+    }
+  }
+
+  async function clearChat() {
+    if (clearingChat || sending) return;
+    if (!window.confirm("Hapus seluruh riwayat chat untuk semua pengguna? Tindakan ini tidak dapat dibatalkan.")) return;
+
+    messagesRequestId.current += 1;
+    setClearingChat(true);
+    setChatError("");
+    try {
+      const response = await fetch("/api/messages", { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Riwayat chat tidak dapat dihapus.");
+      setMessages([]);
+    } catch (requestError) {
+      setChatError(requestError.message);
+    } finally {
+      setClearingChat(false);
     }
   }
 
@@ -462,6 +484,9 @@ function App() {
               <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>Chat bersama</h1></div>
               <div className="chat-actions">
                 <span className="demo-badge">BERSAMA</span>
+                <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending}>
+                  {clearingChat ? "Menghapus..." : "Hapus riwayat"}
+                </button>
                 <button className="logout-button" onClick={signOut}>Keluar</button>
               </div>
             </div>
