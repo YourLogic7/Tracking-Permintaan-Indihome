@@ -56,6 +56,30 @@ function App() {
   const [adminNotice, setAdminNotice] = useState("");
 
   useEffect(() => {
+    let active = true;
+
+    async function restoreSession() {
+      try {
+        const response = await fetch("/api/auth/me");
+        if (response.status === 401) return;
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Sesi tidak dapat dipulihkan.");
+        if (active) {
+          setUser(data.user);
+          setPage(data.user.role === "admin" ? "admin" : "chat");
+        }
+      } catch (requestError) {
+        console.error("Session restoration failed:", requestError);
+      }
+    }
+
+    restoreSession();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (page !== "chat" && page !== "admin") return undefined;
 
     let active = true;
