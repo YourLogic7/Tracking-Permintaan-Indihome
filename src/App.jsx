@@ -54,6 +54,12 @@ function App() {
   const [newAccount, setNewAccount] = useState({ username: "", password: "" });
   const [adminError, setAdminError] = useState("");
   const [adminNotice, setAdminNotice] = useState("");
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   useEffect(() => {
     let active = true;
@@ -300,6 +306,16 @@ function App() {
           </button>
           <button className={page === "about" ? "nav-link active" : "nav-link"} onClick={() => setPage("about")}>
             Tentang Kami
+          </button>
+          <button
+            className="theme-toggle"
+            type="button"
+            onClick={() => setDarkMode((current) => !current)}
+            aria-pressed={darkMode}
+            aria-label={darkMode ? "Aktifkan mode terang" : "Aktifkan mode gelap"}
+          >
+            <span aria-hidden="true">{darkMode ? "☀" : "☾"}</span>
+            <span className="theme-toggle-label">{darkMode ? "Mode terang" : "Mode gelap"}</span>
           </button>
         </nav>
       </header>
