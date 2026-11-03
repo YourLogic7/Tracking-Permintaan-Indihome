@@ -22,17 +22,15 @@ export default api(async (req, res) => {
       .sort({ createdAt: -1, _id: -1 })
       .limit(50)
       .toArray();
-    return sendJson(
-      res,
-      200,
-      recent.reverse().map((message) => ({
+    return sendJson(res, 200, {
+      messages: recent.reverse().map((message) => ({
         id: message._id.toString(),
         senderId: message.senderId,
         username: message.username,
         text: message.text,
         createdAt: message.createdAt,
       })),
-    );
+    });
   }
 
   if (req.method !== "POST") return methodNotAllowed(res, ["GET", "POST"]);
