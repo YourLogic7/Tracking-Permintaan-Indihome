@@ -513,8 +513,8 @@ function App() {
                     )}
                     <p>{message.text}</p>
                     <time>{new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</time>
-                    {message.senderId === user?.id && message.isRead && (
-                      <span className="message-read-status">Dibaca oleh pengguna lain</span>
+                    {message.senderId === user?.id && (
+                      <span className="message-read-status">{message.isRead ? "Read" : "D"}</span>
                     )}
                     <button
                       className="reply-button"
