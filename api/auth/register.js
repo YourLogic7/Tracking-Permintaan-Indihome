@@ -21,6 +21,7 @@ export default api(async (req, res) => {
       username,
       passwordSalt: credentials.salt,
       passwordHash: credentials.hash,
+      authVersion: 0,
       createdAt: new Date(),
     });
     const user = { _id: result.insertedId, username };

@@ -101,6 +101,8 @@ h1, h2, p { margin-top: 0; }
 .about-card h2 { margin: 4px 0 7px; font: 700 17px "Manrope", sans-serif; }
 .about-card p { margin: 0 0 17px; max-width: 520px; color: #77849a; font-size: 12px; line-height: 1.7; }
 .about-button { min-height: 42px; }
+.admin-entry { display: block; margin-top: 12px; padding: 3px 0; border: 0; color: #748199; background: transparent; font-size: 11px; }
+.admin-entry:hover { color: #2878f0; }
 .back-link { padding: 0; border: 0; background: transparent; color: #63728a; font-size: 12px; }
 .back-link:hover { color: #2878f0; }
 .chat-heading { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 28px; }
@@ -128,6 +130,35 @@ h1, h2, p { margin-top: 0; }
 .send-button:disabled { cursor: not-allowed; opacity: .5; }
 .chat-disclaimer { margin: 13px 0 0; color: #9a7a48; font-size: 10px; }
 .chat-error { margin: 11px 16px 0; }
+.admin-page .chat-heading { margin-top: 26px; }
+.admin-page .chat-heading h1 { font-size: 38px; }
+.admin-page .subpage-copy { margin-top: 10px; }
+.account-create-card, .accounts-card { margin-top: 21px; padding: 22px; border: 1px solid #e8eef6; border-radius: 12px; background: white; box-shadow: 0 12px 30px #223a5d09; }
+.account-create-card h2, .accounts-card h2 { margin: 0 0 17px; font: 700 15px "Manrope", sans-serif; }
+.account-create-fields { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 12px; }
+.account-create-fields label { display: grid; gap: 7px; color: #53627a; font-size: 11px; font-weight: 600; }
+.account-create-fields input, .account-controls input { height: 40px; min-width: 0; padding: 0 10px; border: 1px solid #e4eaf2; border-radius: 7px; outline: 0; color: var(--navy); font-size: 11px; }
+.account-create-fields input:focus, .account-controls input:focus { border-color: #85b8ff; outline: 2px solid #d6e8ff; }
+.account-create-fields .primary-button { min-height: 40px; white-space: nowrap; }
+.accounts-card h2 { display: flex; justify-content: space-between; align-items: center; }
+.accounts-card h2 span { display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px; color: #347bec; background: #edf5ff; font: 700 10px "DM Sans", sans-serif; }
+.accounts-empty { margin: 0; color: #8995a8; font-size: 12px; }
+.accounts-list { display: grid; }
+.account-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 13px 0; border-top: 1px solid #edf1f6; }
+.account-identity { display: flex; align-items: center; gap: 10px; min-width: 130px; }
+.account-identity .avatar { width: 34px; height: 34px; flex: none; }
+.account-identity strong, .account-identity small { display: block; }
+.account-identity strong { color: #344158; font-size: 11px; }
+.account-identity small { margin-top: 4px; color: #99a4b4; font-size: 9px; }
+.account-controls { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.account-controls input { width: 145px; height: 34px; }
+.small-action { height: 34px; padding: 0 9px; border: 1px solid #e3ebf5; border-radius: 6px; color: #3475ce; background: #f7faff; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.small-action:hover:not(:disabled) { border-color: #bfd9fc; background: #edf5ff; }
+.small-action:disabled { cursor: not-allowed; opacity: .5; }
+.small-action.danger { color: #c64c56; background: #fff9f9; }
+.small-action.danger:hover { border-color: #f2c9cc; background: #fff0f1; }
+.admin-feedback, .admin-notice { margin: 13px 0 0; font-size: 12px; }
+.admin-notice { color: #27815e; }
 
 footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: space-between; gap: 16px; margin: 0 auto; padding: 23px 0; border-top: 1px solid #e9eef5; color: #9aa5b5; font-size: 10px; }
 .modal-backdrop { position: fixed; z-index: 5; inset: 0; display: grid; place-items: center; padding: 20px; background: #14223b75; backdrop-filter: blur(4px); }
@@ -157,6 +188,11 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
   .search-card { padding: 17px; }
   .result-top { align-items: flex-start; flex-direction: column; }
   .subpage { padding-top: 48px; min-height: 70vh; }
+  .account-create-fields { grid-template-columns: 1fr; }
+  .account-create-fields .primary-button { justify-self: start; }
+  .account-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .account-controls { width: 100%; justify-content: flex-start; }
+  .account-controls input { flex: 1; width: auto; }
   footer { width: calc(100% - 36px); flex-direction: column; font-size: 9px; }
 }
 @media (max-width: 440px) {
@@ -169,5 +205,8 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
   .hero h1 { letter-spacing: -1.7px; }
   .about-card { padding: 19px; gap: 13px; }
   .chat-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .account-create-card, .accounts-card { padding: 17px; }
+  .account-controls { flex-wrap: wrap; }
+  .account-controls input { flex: 1 1 100%; }
   .login-modal { padding: 25px 21px; }
 }

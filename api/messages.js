@@ -1,10 +1,21 @@
+import { ObjectId } from "mongodb";
 import { api, getCollections, getSession, methodNotAllowed, readBody, sendJson } from "../lib/server.js";
 
 export default api(async (req, res) => {
   const session = getSession(req);
   if (!session) return sendJson(res, 401, { error: "Silakan masuk terlebih dahulu." });
+  if (session.role !== "user" || !ObjectId.isValid(session.userId)) {
+    return sendJson(res, 403, { error: "Akun ini tidak memiliki akses ke ruang chat." });
+  }
 
-  const { messages } = await getCollections();
+  const { messages, users } = await getCollections();
+  const account = await users.findOne(
+    { _id: new ObjectId(session.userId) },
+    { projection: { _id: 1, authVersion: 1 } },
+  );
+  if (!account || (account.authVersion || 0) !== session.authVersion) {
+    return sendJson(res, 401, { error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
+  }
   if (req.method === "GET") {
     const recent = await messages
       .find({}, { projection: { senderId: 1, username: 1, text: 1, createdAt: 1 } })

@@ -48,9 +48,15 @@ function App() {
   const [chatError, setChatError] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [accountsLoaded, setAccountsLoaded] = useState(false);
+  const [accountPasswords, setAccountPasswords] = useState({});
+  const [newAccount, setNewAccount] = useState({ username: "", password: "" });
+  const [adminError, setAdminError] = useState("");
+  const [adminNotice, setAdminNotice] = useState("");
 
   useEffect(() => {
-    if (page !== "chat") return undefined;
+    if (page !== "chat" && page !== "admin") return undefined;
 
     let active = true;
     async function loadMessages() {
@@ -67,11 +73,27 @@ function App() {
       }
     }
 
-    loadMessages();
-    const timer = window.setInterval(loadMessages, 4000);
+    async function loadAccounts() {
+      try {
+        const response = await fetch("/api/admin/users");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Daftar akun tidak dapat dimuat.");
+        if (active) {
+          setAccounts(data);
+          setAccountsLoaded(true);
+          setAdminError("");
+        }
+      } catch (requestError) {
+        if (active) setAdminError(requestError.message);
+      }
+    }
+
+    if (page === "chat") loadMessages();
+    else loadAccounts();
+    const timer = page === "chat" ? window.setInterval(loadMessages, 4000) : null;
     return () => {
       active = false;
-      window.clearInterval(timer);
+      if (timer) window.clearInterval(timer);
     };
   }, [page]);
 
@@ -100,24 +122,101 @@ function App() {
     setAuthMode("login");
   }
 
+  function openAdminLogin() {
+    setShowLogin(true);
+    setLoginError("");
+    setUsername("");
+    setPassword("");
+    setAuthMode("admin");
+  }
+
   async function signIn(event) {
     event.preventDefault();
     setLoginError("");
     try {
-      const response = await fetch(`/api/auth/${authMode === "register" ? "register" : "login"}`, {
+      const endpoint = authMode === "admin"
+        ? "/api/admin/login"
+        : `/api/auth/${authMode === "register" ? "register" : "login"}`;
+      const body = authMode === "admin" ? { password } : { username, password };
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(body),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Tidak dapat masuk.");
       setUser(data.user);
       setMessages([]);
       setChatError("");
+      setAdminError("");
+      setAdminNotice("");
+      setAccountsLoaded(false);
       setShowLogin(false);
-      setPage("chat");
+      setPage(authMode === "admin" ? "admin" : "chat");
     } catch (requestError) {
       setLoginError(requestError.message);
+    }
+  }
+
+  async function refreshAccounts() {
+    const response = await fetch("/api/admin/users");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Daftar akun tidak dapat dimuat.");
+    setAccounts(data);
+    setAccountsLoaded(true);
+  }
+
+  async function createAccount(event) {
+    event.preventDefault();
+    setAdminError("");
+    setAdminNotice("");
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newAccount),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Akun tidak dapat dibuat.");
+      setNewAccount({ username: "", password: "" });
+      setAdminNotice(`Akun ${data.user.username} berhasil dibuat.`);
+      await refreshAccounts();
+    } catch (requestError) {
+      setAdminError(requestError.message);
+    }
+  }
+
+  async function resetAccountPassword(id, username) {
+    const password = accountPasswords[id] || "";
+    setAdminError("");
+    setAdminNotice("");
+    try {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Kata sandi tidak dapat diperbarui.");
+      setAccountPasswords((current) => ({ ...current, [id]: "" }));
+      setAdminNotice(`Kata sandi akun ${username} berhasil diperbarui.`);
+    } catch (requestError) {
+      setAdminError(requestError.message);
+    }
+  }
+
+  async function removeAccount(account) {
+    if (!window.confirm(`Hapus akun ${account.username}?`)) return;
+    setAdminError("");
+    setAdminNotice("");
+    try {
+      const response = await fetch(`/api/admin/users/${account.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Akun tidak dapat dihapus.");
+      setAdminNotice(`Akun ${account.username} berhasil dihapus.`);
+      await refreshAccounts();
+    } catch (requestError) {
+      setAdminError(requestError.message);
     }
   }
 
@@ -145,6 +244,7 @@ function App() {
   }
 
   async function signOut() {
+    const isAdmin = user?.role === "admin";
     try {
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error("Tidak dapat keluar.");
@@ -152,8 +252,11 @@ function App() {
       setPage("about");
       setMessages([]);
       setChatError("");
+      setAdminError("");
+      setAdminNotice("");
     } catch (requestError) {
-      setChatError(requestError.message);
+      if (isAdmin) setAdminError(requestError.message);
+      else setChatError(requestError.message);
     }
   }
 
@@ -251,7 +354,63 @@ function App() {
                 <h2>Butuh bantuan lebih lanjut?</h2>
                 <p>Masuk atau buat akun untuk bergabung ke ruang chat bersama.</p>
                 <button className="primary-button about-button" onClick={openChatLogin}>Buka ruang chat <span aria-hidden="true">→</span></button>
+                <button className="admin-entry" onClick={openAdminLogin}>Mode admin</button>
               </div>
+            </div>
+          </section>
+        )}
+
+        {page === "admin" && (
+          <section className="subpage admin-page">
+            <button className="back-link" onClick={() => setPage("about")}>← Kembali ke Tentang Kami</button>
+            <div className="chat-heading">
+              <div><span className="eyebrow"><span className="eyebrow-dot" /> PANEL ADMIN</span><h1>Kelola akun</h1></div>
+              <button className="logout-button" onClick={signOut}>Keluar dari admin</button>
+            </div>
+            <p className="subpage-copy">Buat akun pengguna, perbarui kata sandi, atau hapus akun yang sudah terdaftar.</p>
+            <form className="account-create-card" onSubmit={createAccount}>
+              <h2>Buat akun pengguna</h2>
+              <div className="account-create-fields">
+                <label>Nama pengguna
+                  <input minLength={3} maxLength={24} placeholder="contoh: nama_pengguna" value={newAccount.username} onChange={(event) => setNewAccount((current) => ({ ...current, username: event.target.value }))} required />
+                </label>
+                <label>Kata sandi sementara
+                  <input type="password" minLength={10} maxLength={128} placeholder="Minimal 10 karakter" value={newAccount.password} onChange={(event) => setNewAccount((current) => ({ ...current, password: event.target.value }))} required />
+                </label>
+                <button className="primary-button" type="submit">Buat akun <span aria-hidden="true">→</span></button>
+              </div>
+            </form>
+            {adminError && <p className="form-error admin-feedback" role="alert">{adminError}</p>}
+            {adminNotice && <p className="admin-notice" role="status">{adminNotice}</p>}
+            <div className="accounts-card">
+              <h2>Akun terdaftar <span>{accounts.length}</span></h2>
+              {accounts.length === 0 ? (
+                <p className="accounts-empty">{accountsLoaded ? "Belum ada akun terdaftar." : "Memuat daftar akun..."}</p>
+              ) : (
+                <div className="accounts-list">
+                  {accounts.map((account) => (
+                    <div className="account-row" key={account.id}>
+                      <div className="account-identity">
+                        <span className="avatar">{account.username.slice(0, 1).toUpperCase()}</span>
+                        <div><strong>{account.username}</strong><small>Bergabung {new Date(account.createdAt).toLocaleDateString("id-ID")}</small></div>
+                      </div>
+                      <div className="account-controls">
+                        <input
+                          aria-label={`Kata sandi baru untuk ${account.username}`}
+                          type="password"
+                          minLength={10}
+                          maxLength={128}
+                          placeholder="Kata sandi baru"
+                          value={accountPasswords[account.id] || ""}
+                          onChange={(event) => setAccountPasswords((current) => ({ ...current, [account.id]: event.target.value }))}
+                        />
+                        <button className="small-action" disabled={(accountPasswords[account.id] || "").length < 10} onClick={() => resetAccountPassword(account.id, account.username)}>Simpan sandi</button>
+                        <button className="small-action danger" onClick={() => removeAccount(account)}>Hapus</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -311,19 +470,21 @@ function App() {
             <button className="close-button" onClick={() => setShowLogin(false)} aria-label="Tutup">×</button>
             <div className="modal-icon">↪</div>
             <span className="eyebrow"><span className="eyebrow-dot" /> VERIFIKASI ULANG</span>
-            <h2 id="login-title">{authMode === "register" ? "Buat akun chat" : "Masuk untuk melanjutkan"}</h2>
-            <p>{authMode === "register" ? "Buat akun untuk mengirim dan membaca pesan di ruang bersama." : "Masuk dengan akun Anda untuk membuka ruang chat."}</p>
+            <h2 id="login-title">{authMode === "admin" ? "Masuk mode admin" : authMode === "register" ? "Buat akun chat" : "Masuk untuk melanjutkan"}</h2>
+            <p>{authMode === "admin" ? "Masukkan password admin yang sudah diatur di environment Vercel." : authMode === "register" ? "Buat akun untuk mengirim dan membaca pesan di ruang bersama." : "Masuk dengan akun Anda untuk membuka ruang chat."}</p>
             <form onSubmit={signIn}>
-              <label htmlFor="username">Nama pengguna</label>
-              <input id="username" autoComplete="username" minLength={3} maxLength={24} value={username} onChange={(event) => setUsername(event.target.value)} />
-              <label htmlFor="password">Kata sandi</label>
+              {authMode !== "admin" && <>
+                <label htmlFor="username">Nama pengguna</label>
+                <input id="username" autoComplete="username" minLength={3} maxLength={24} value={username} onChange={(event) => setUsername(event.target.value)} />
+              </>}
+              <label htmlFor="password">{authMode === "admin" ? "Password admin" : "Kata sandi"}</label>
               <input id="password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} minLength={authMode === "register" ? 10 : undefined} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} />
               {loginError && <p className="form-error" role="alert">{loginError}</p>}
-              <button className="primary-button modal-submit" type="submit">{authMode === "register" ? "Buat akun & masuk" : "Masuk ke chat"} <span aria-hidden="true">→</span></button>
+              <button className="primary-button modal-submit" type="submit">{authMode === "admin" ? "Masuk admin" : authMode === "register" ? "Buat akun & masuk" : "Masuk ke chat"} <span aria-hidden="true">→</span></button>
             </form>
-            <button className="auth-toggle" onClick={() => { setAuthMode(authMode === "register" ? "login" : "register"); setLoginError(""); }}>
+            {authMode !== "admin" && <button className="auth-toggle" onClick={() => { setAuthMode(authMode === "register" ? "login" : "register"); setLoginError(""); }}>
               {authMode === "register" ? "Sudah punya akun? Masuk" : "Belum punya akun? Buat akun"}
-            </button>
+            </button>}
           </section>
         </div>
       )}
