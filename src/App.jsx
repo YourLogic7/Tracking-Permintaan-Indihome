@@ -486,7 +486,7 @@ function App() {
           <section className="subpage chat-page">
             <button className="back-link" onClick={() => setPage("about")}>← Kembali ke Tentang Kami</button>
             <div className="chat-heading">
-              <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>Chat bersama</h1></div>
+              <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>Pelaporan Pengaduan</h1></div>
               <div className="chat-actions">
                 <span className="demo-badge">BERSAMA</span>
                 <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending}>
