@@ -18,7 +18,7 @@ npm run dev
 - Pastikan `ADMIN_PASSWORD` dan `SESSION_SECRET` diaktifkan untuk environment deployment yang sedang dibuka (Production, Preview, atau Development), lalu redeploy setelah mengubah nilainya.
 - Deploy proyek ke Vercel. Endpoint API ada di `api/`; akun dibuat dari dialog chat. Kata sandi disimpan sebagai hash, dan sesi menggunakan cookie HttpOnly.
 - Tautan **Mode admin** ada di halaman Tentang Kami. Masuk dengan `ADMIN_PASSWORD` untuk membuat akun, mereset kata sandi, atau menghapus akun pengguna. Reset kata sandi dan penghapusan akun mencabut akses sesi chat lama. Akses admin dijaga backend, bukan hanya tampilan frontend.
-- Semua pengguna terdaftar melihat ruang chat yang sama. Pesan dan foto tersimpan di koleksi `messages`, dan antarmuka memeriksa pesan baru setiap 4 detik. Foto dikompres di browser menjadi JPEG maksimal 1 MB sebelum dikirim.
+- Semua pengguna terdaftar melihat ruang chat yang sama. Pesan dan foto tersimpan di koleksi `messages`, dan antarmuka memeriksa pesan baru setiap 4 detik. Pengguna chat dapat menghapus satu pesan pilihan untuk semua orang atau menghapus seluruh riwayat. Foto dikompres di browser menjadi JPEG maksimal 1 MB sebelum dikirim.
 
 `npm run dev` menjalankan Vite untuk antarmuka saja; untuk menjalankan Vercel Functions secara lokal, isi `.env.local` (gunakan `.env.example` sebagai acuan) lalu jalankan `npx vercel dev` dari Vercel CLI.
 

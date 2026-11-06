@@ -138,8 +138,11 @@ h1, h2, p { margin-top: 0; }
 .message-author { display: block; margin-bottom: 5px; color: var(--accent); font-size: 10px; }
 .message time { display: block; margin-top: 5px; color: #9ba6b5; text-align: right; font-size: 9px; }
 .message-read-status { display: block; margin-top: 3px; color: #748199; text-align: right; font-size: 9px; }
-.reply-button { display: block; margin: 5px 0 0 auto; padding: 2px 0; border: 0; color: var(--accent); background: transparent; font-size: 9px; font-weight: 600; }
-.reply-button:disabled { cursor: not-allowed; opacity: .5; }
+.message-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 5px; }
+.reply-button, .delete-message-button { padding: 2px 0; border: 0; background: transparent; font-size: 9px; font-weight: 600; }
+.reply-button { color: var(--accent); }
+.delete-message-button { color: #b91f2d; }
+.reply-button:disabled, .delete-message-button:disabled { cursor: not-allowed; opacity: .5; }
 .replying-to { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px; border-top: 1px solid #edf1f6; background: #fff8f8; }
 .replying-to > div { display: grid; min-width: 0; gap: 3px; }
 .replying-to button { flex: none; width: 25px; height: 25px; border: 0; border-radius: 50%; color: #748199; background: transparent; font-size: 18px; }
@@ -263,6 +266,7 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .messages { background: #151a21; }
 :root[data-theme="dark"] .message { color: #e7eaf0; background: #202731; border-color: #35404d; }
 :root[data-theme="dark"] .message.mine { background: #351c21; border-color: #693039; }
+:root[data-theme="dark"] .delete-message-button { color: #ff858d; }
 :root[data-theme="dark"] .photo-button { border-color: #384250; }
 :root[data-theme="dark"] .message-reply-quote { background: #181e26; }
 :root[data-theme="dark"] .message-reply-quote span,

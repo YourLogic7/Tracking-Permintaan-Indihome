@@ -96,6 +96,7 @@ function App() {
   const [replyingTo, setReplyingTo] = useState(null);
   const [sending, setSending] = useState(false);
   const [clearingChat, setClearingChat] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
   const messagesRequestId = useRef(0);
   const [accounts, setAccounts] = useState([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
@@ -304,7 +305,7 @@ function App() {
   async function sendMessage(event) {
     event.preventDefault();
     const text = draft.trim();
-    if ((!text && !chatImage) || sending || preparingImage || clearingChat) return;
+    if ((!text && !chatImage) || sending || preparingImage || clearingChat || deletingMessageId) return;
     setSending(true);
     setChatError("");
     try {
@@ -331,7 +332,7 @@ function App() {
   }
 
   async function clearChat() {
-    if (clearingChat || sending) return;
+    if (clearingChat || sending || deletingMessageId) return;
     if (!window.confirm("Hapus seluruh riwayat chat untuk semua pengguna? Tindakan ini tidak dapat dibatalkan.")) return;
 
     messagesRequestId.current += 1;
@@ -347,6 +348,30 @@ function App() {
       setChatError(requestError.message);
     } finally {
       setClearingChat(false);
+    }
+  }
+
+  async function deleteMessage(message) {
+    if (deletingMessageId || clearingChat || sending) return;
+    if (!window.confirm("Hapus pesan ini dari ruang chat untuk semua pengguna?")) return;
+
+    setDeletingMessageId(message.id);
+    setChatError("");
+    try {
+      const response = await fetch("/api/messages", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: message.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Pesan tidak dapat dihapus.");
+      messagesRequestId.current += 1;
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+      setReplyingTo((current) => current?.id === message.id ? null : current);
+    } catch (requestError) {
+      setChatError(requestError.message);
+    } finally {
+      setDeletingMessageId(null);
     }
   }
 
@@ -541,7 +566,7 @@ function App() {
               <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>Pelaporan Pengaduan</h1></div>
               <div className="chat-actions">
                 <span className="demo-badge">BERSAMA</span>
-                <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending}>
+                <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending || Boolean(deletingMessageId)}>
                   {clearingChat ? "Menghapus..." : "Hapus riwayat"}
                 </button>
                 <button className="logout-button" onClick={signOut}>Keluar</button>
@@ -571,14 +596,24 @@ function App() {
                     {message.senderId === user?.id && (
                       <span className="message-read-status">{message.isRead ? "Read" : "D"}</span>
                     )}
-                    <button
-                      className="reply-button"
-                      type="button"
-                      onClick={() => setReplyingTo(message)}
-                      disabled={clearingChat || sending}
-                    >
-                      Balas
-                    </button>
+                    <div className="message-actions">
+                      <button
+                        className="reply-button"
+                        type="button"
+                        onClick={() => setReplyingTo(message)}
+                        disabled={clearingChat || sending || Boolean(deletingMessageId)}
+                      >
+                        Balas
+                      </button>
+                      <button
+                        className="delete-message-button"
+                        type="button"
+                        onClick={() => deleteMessage(message)}
+                        disabled={clearingChat || sending || Boolean(deletingMessageId)}
+                      >
+                        {deletingMessageId === message.id ? "Menghapus..." : "Hapus"}
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

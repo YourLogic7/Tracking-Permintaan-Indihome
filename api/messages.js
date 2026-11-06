@@ -17,6 +17,16 @@ export default api(async (req, res) => {
     return sendJson(res, 401, { error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
   }
   if (req.method === "DELETE") {
+    const { messageId } = readBody(req);
+    if (messageId !== undefined) {
+      if (typeof messageId !== "string" || !ObjectId.isValid(messageId)) {
+        return sendJson(res, 400, { error: "Pesan yang akan dihapus tidak valid." });
+      }
+      const result = await messages.deleteOne({ _id: new ObjectId(messageId) });
+      if (!result.deletedCount) return sendJson(res, 404, { error: "Pesan tidak ditemukan." });
+      return sendJson(res, 200, { ok: true, deletedId: messageId });
+    }
+
     const result = await messages.deleteMany({});
     return sendJson(res, 200, { ok: true, deletedCount: result.deletedCount });
   }
