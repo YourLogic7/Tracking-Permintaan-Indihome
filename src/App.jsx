@@ -1,5 +1,49 @@
 import { useEffect, useRef, useState } from "react";
 
+const MAX_CHAT_IMAGE_BYTES = 1024 * 1024;
+
+async function prepareChatImage(file) {
+  if (!file.type.startsWith("image/")) throw new Error("Pilih file gambar yang valid.");
+  if (file.size > 15 * 1024 * 1024) throw new Error("Ukuran foto asli maksimal 15 MB.");
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Foto tidak dapat diproses di browser ini.");
+
+    let blob;
+    for (const maxDimension of [1280, 1024, 800]) {
+      const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      context.fillStyle = "#fff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of [0.82, 0.68, 0.54]) {
+        blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+        if (!blob) throw new Error("Foto tidak dapat dikompres.");
+        if (blob.size <= MAX_CHAT_IMAGE_BYTES) break;
+      }
+      if (blob.size <= MAX_CHAT_IMAGE_BYTES) break;
+    }
+
+    if (!blob || blob.size > MAX_CHAT_IMAGE_BYTES) {
+      throw new Error("Foto terlalu besar setelah dikompres. Coba pilih foto lain.");
+    }
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Foto tidak dapat dibaca."));
+      reader.readAsDataURL(blob);
+    });
+  } finally {
+    bitmap.close();
+  }
+}
+
 const outcomes = [
   {
     status: "Permintaan diterima",
@@ -47,6 +91,8 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [chatError, setChatError] = useState("");
   const [draft, setDraft] = useState("");
+  const [chatImage, setChatImage] = useState("");
+  const [preparingImage, setPreparingImage] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [sending, setSending] = useState(false);
   const [clearingChat, setClearingChat] = useState(false);
@@ -258,19 +304,24 @@ function App() {
   async function sendMessage(event) {
     event.preventDefault();
     const text = draft.trim();
-    if (!text || sending || clearingChat) return;
+    if ((!text && !chatImage) || sending || preparingImage || clearingChat) return;
     setSending(true);
     setChatError("");
     try {
       const response = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, ...(replyingTo ? { replyToId: replyingTo.id } : {}) }),
+        body: JSON.stringify({
+          text,
+          ...(chatImage ? { imageData: chatImage } : {}),
+          ...(replyingTo ? { replyToId: replyingTo.id } : {}),
+        }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Pesan tidak dapat dikirim.");
       setMessages((current) => [...current, data.message]);
       setDraft("");
+      setChatImage("");
       setReplyingTo(null);
     } catch (requestError) {
       setChatError(requestError.message);
@@ -308,6 +359,7 @@ function App() {
       setPage("about");
       setMessages([]);
       setReplyingTo(null);
+      setChatImage("");
       setChatError("");
       setAdminError("");
       setAdminNotice("");
@@ -508,10 +560,13 @@ function App() {
                     {message.replyTo && (
                       <div className="message-reply-quote">
                         <strong>{message.replyTo.username}</strong>
-                        <span>{message.replyTo.text}</span>
+                        <span>{message.replyTo.text || "Foto"}</span>
                       </div>
                     )}
-                    <p>{message.text}</p>
+                    {message.imageType && (
+                      <img className="message-image" src={`/api/messages/${message.id}/image`} alt="Foto dalam pesan chat" loading="lazy" />
+                    )}
+                    {message.text && <p>{message.text}</p>}
                     <time>{new Date(message.createdAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</time>
                     {message.senderId === user?.id && (
                       <span className="message-read-status">{message.isRead ? "Read" : "D"}</span>
@@ -532,20 +587,49 @@ function App() {
                 <div className="replying-to">
                   <div>
                     <strong>Membalas {replyingTo.username}</strong>
-                    <span>{replyingTo.text}</span>
+                    <span>{replyingTo.text || "Foto"}</span>
                   </div>
                   <button type="button" onClick={() => setReplyingTo(null)} aria-label="Batalkan balasan">×</button>
                 </div>
               )}
+              {chatImage && (
+                <div className="chat-image-preview">
+                  <img src={chatImage} alt="Pratinjau foto yang akan dikirim" />
+                  <button type="button" onClick={() => setChatImage("")} aria-label="Hapus foto">×</button>
+                </div>
+              )}
               <form className="message-form" onSubmit={sendMessage}>
+                <label className="photo-button" aria-label="Pilih foto">
+                  <span aria-hidden="true">＋</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    aria-label="Pilih foto untuk dikirim"
+                    disabled={sending || preparingImage || clearingChat}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = "";
+                      if (!file) return;
+                      setPreparingImage(true);
+                      setChatError("");
+                      try {
+                        setChatImage(await prepareChatImage(file));
+                      } catch (requestError) {
+                        setChatError(requestError.message || "Foto tidak dapat diproses.");
+                      } finally {
+                        setPreparingImage(false);
+                      }
+                    }}
+                  />
+                </label>
                 <input
                   aria-label="Tulis pesan"
-                  placeholder="Tulis pesan..."
+                  placeholder={preparingImage ? "Menyiapkan foto..." : "Tulis pesan..."}
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   maxLength={1000}
                 />
-                <button className="send-button" type="submit" aria-label="Kirim pesan" disabled={sending || clearingChat || !draft.trim()}>↑</button>
+                <button className="send-button" type="submit" aria-label="Kirim pesan" disabled={sending || preparingImage || clearingChat || (!draft.trim() && !chatImage)}>↑</button>
               </form>
             </div>
             <p className="chat-disclaimer">Pesan disimpan di MongoDB. Percakapan diperbarui otomatis setiap beberapa detik.</p>
