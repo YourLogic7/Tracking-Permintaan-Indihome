@@ -217,7 +217,7 @@ function App() {
     try {
       const endpoint = authMode === "admin"
         ? "/api/admin/login"
-        : `/api/auth/${authMode === "register" ? "register" : "login"}`;
+        : "/api/auth/login";
       const body = authMode === "admin" ? { password } : { username, password };
       const response = await fetch(endpoint, {
         method: "POST",
@@ -685,21 +685,18 @@ function App() {
             <button className="close-button" onClick={() => setShowLogin(false)} aria-label="Tutup">×</button>
             <div className="modal-icon">↪</div>
             <span className="eyebrow"><span className="eyebrow-dot" /> VERIFIKASI ULANG</span>
-            <h2 id="login-title">{authMode === "admin" ? "Masuk mode admin" : authMode === "register" ? "Buat akun chat" : "Masuk untuk melanjutkan"}</h2>
-            <p>{authMode === "admin" ? "Masukkan password admin yang sudah diatur di environment Vercel." : authMode === "register" ? "Buat akun untuk mengirim dan membaca pesan di ruang bersama." : "Masuk dengan akun Anda untuk membuka ruang chat."}</p>
+            <h2 id="login-title">{authMode === "admin" ? "Masuk mode admin" : "Masuk untuk melanjutkan"}</h2>
+            <p>{authMode === "admin" ? "Masukkan password admin yang sudah diatur di environment Vercel." : "Masuk dengan akun yang dibuat oleh admin untuk membuka ruang chat."}</p>
             <form onSubmit={signIn}>
               {authMode !== "admin" && <>
                 <label htmlFor="username">Nama pengguna</label>
                 <input id="username" autoComplete="username" minLength={3} maxLength={24} value={username} onChange={(event) => setUsername(event.target.value)} />
               </>}
               <label htmlFor="password">{authMode === "admin" ? "Password admin" : "Kata sandi"}</label>
-              <input id="password" type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} minLength={authMode === "register" ? 10 : undefined} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} />
+              <input id="password" type="password" autoComplete="current-password" maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} />
               {loginError && <p className="form-error" role="alert">{loginError}</p>}
-              <button className="primary-button modal-submit" type="submit">{authMode === "admin" ? "Masuk admin" : authMode === "register" ? "Buat akun & masuk" : "Masuk ke chat"} <span aria-hidden="true">→</span></button>
+              <button className="primary-button modal-submit" type="submit">{authMode === "admin" ? "Masuk admin" : "Masuk ke chat"} <span aria-hidden="true">→</span></button>
             </form>
-            {authMode !== "admin" && <button className="auth-toggle" onClick={() => { setAuthMode(authMode === "register" ? "login" : "register"); setLoginError(""); }}>
-              {authMode === "register" ? "Sudah punya akun? Masuk" : "Belum punya akun? Buat akun"}
-            </button>}
           </section>
         </div>
       )}
