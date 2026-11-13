@@ -105,6 +105,7 @@ function App() {
   const [adminError, setAdminError] = useState("");
   const [adminNotice, setAdminNotice] = useState("");
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
@@ -299,6 +300,21 @@ function App() {
       await refreshAccounts();
     } catch (requestError) {
       setAdminError(requestError.message);
+    }
+  }
+
+  async function handleImageSelection(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setPreparingImage(true);
+    setChatError("");
+    try {
+      setChatImage(await prepareChatImage(file));
+    } catch (requestError) {
+      setChatError(requestError.message || "Foto tidak dapat diproses.");
+    } finally {
+      setPreparingImage(false);
     }
   }
 
@@ -509,7 +525,10 @@ function App() {
             <button className="back-link" onClick={() => setPage("about")}>← Kembali ke Tentang Kami</button>
             <div className="chat-heading">
               <div><span className="eyebrow"><span className="eyebrow-dot" /> PANEL ADMIN</span><h1>Kelola akun</h1></div>
-              <button className="logout-button" onClick={signOut}>Keluar dari admin</button>
+              <div className="chat-actions">
+                <button className="small-action" onClick={() => setPage("chat")}>Masuk ruang chat</button>
+                <button className="logout-button" onClick={signOut}>Keluar dari admin</button>
+              </div>
             </div>
             <p className="subpage-copy">Buat akun pengguna, perbarui kata sandi, atau hapus akun yang sudah terdaftar.</p>
             <form className="account-create-card" onSubmit={createAccount}>
@@ -561,21 +580,27 @@ function App() {
 
         {page === "chat" && (
           <section className="subpage chat-page">
-            <button className="back-link" onClick={() => setPage("about")}>← Kembali ke Tentang Kami</button>
+            <button className="back-link" onClick={() => setPage(isAdmin ? "admin" : "about")}>
+              {isAdmin ? "← Kembali ke Panel Admin" : "← Kembali ke Tentang Kami"}
+            </button>
             <div className="chat-heading">
-              <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>Pelaporan Pengaduan</h1></div>
+              <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>{isAdmin ? "Riwayat percakapan" : "Pelaporan Pengaduan"}</h1></div>
               <div className="chat-actions">
                 <span className="demo-badge">BERSAMA</span>
-                <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending || Boolean(deletingMessageId)}>
-                  {clearingChat ? "Menghapus..." : "Hapus riwayat"}
-                </button>
-                <button className="logout-button" onClick={signOut}>Keluar</button>
+                {!isAdmin && (
+                  <>
+                    <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending || Boolean(deletingMessageId)}>
+                      {clearingChat ? "Menghapus..." : "Hapus riwayat"}
+                    </button>
+                    <button className="logout-button" onClick={signOut}>Keluar</button>
+                  </>
+                )}
               </div>
             </div>
             <div className="chat-panel">
               <div className="chat-contact">
                 <span className="avatar">C</span>
-                <div><strong>Ruang bersama</strong><small>Masuk sebagai {user?.username}</small></div>
+                <div><strong>Ruang bersama</strong><small>{isAdmin ? "Mode admin · hanya melihat pesan" : `Masuk sebagai ${user?.username}`}</small></div>
                 <span className="online-dot" />
               </div>
               <div className="messages" aria-live="polite">
@@ -596,29 +621,31 @@ function App() {
                     {message.senderId === user?.id && (
                       <span className="message-read-status">{message.isRead ? "Read" : "D"}</span>
                     )}
-                    <div className="message-actions">
-                      <button
-                        className="reply-button"
-                        type="button"
-                        onClick={() => setReplyingTo(message)}
-                        disabled={clearingChat || sending || Boolean(deletingMessageId)}
-                      >
-                        Balas
-                      </button>
-                      <button
-                        className="delete-message-button"
-                        type="button"
-                        onClick={() => deleteMessage(message)}
-                        disabled={clearingChat || sending || Boolean(deletingMessageId)}
-                      >
-                        {deletingMessageId === message.id ? "Menghapus..." : "Hapus"}
-                      </button>
-                    </div>
+                    {!isAdmin && (
+                      <div className="message-actions">
+                        <button
+                          className="reply-button"
+                          type="button"
+                          onClick={() => setReplyingTo(message)}
+                          disabled={clearingChat || sending || Boolean(deletingMessageId)}
+                        >
+                          Balas
+                        </button>
+                        <button
+                          className="delete-message-button"
+                          type="button"
+                          onClick={() => deleteMessage(message)}
+                          disabled={clearingChat || sending || Boolean(deletingMessageId)}
+                        >
+                          {deletingMessageId === message.id ? "Menghapus..." : "Hapus"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
               {chatError && <p className="form-error chat-error" role="alert">{chatError}</p>}
-              {replyingTo && (
+              {!isAdmin && replyingTo && (
                 <div className="replying-to">
                   <div>
                     <strong>Membalas {replyingTo.username}</strong>
@@ -627,13 +654,13 @@ function App() {
                   <button type="button" onClick={() => setReplyingTo(null)} aria-label="Batalkan balasan">×</button>
                 </div>
               )}
-              {chatImage && (
+              {!isAdmin && chatImage && (
                 <div className="chat-image-preview">
                   <img src={chatImage} alt="Pratinjau foto yang akan dikirim" />
                   <button type="button" onClick={() => setChatImage("")} aria-label="Hapus foto">×</button>
                 </div>
               )}
-              <form className="message-form" onSubmit={sendMessage}>
+              {!isAdmin && <form className="message-form" onSubmit={sendMessage}>
                 <label className="photo-button" aria-label="Pilih foto">
                   <span aria-hidden="true">＋</span>
                   <input
@@ -641,20 +668,36 @@ function App() {
                     accept="image/*"
                     aria-label="Pilih foto untuk dikirim"
                     disabled={sending || preparingImage || clearingChat}
-                    onChange={async (event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = "";
-                      if (!file) return;
-                      setPreparingImage(true);
-                      setChatError("");
-                      try {
-                        setChatImage(await prepareChatImage(file));
-                      } catch (requestError) {
-                        setChatError(requestError.message || "Foto tidak dapat diproses.");
-                      } finally {
-                        setPreparingImage(false);
-                      }
-                    }}
+                    onChange={handleImageSelection}
+                  />
+                </label>
+                <label className="camera-button" aria-label="Ambil foto dengan kamera belakang" title="Kamera belakang">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
+                    <circle cx="12" cy="13" r="3.5" />
+                  </svg>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    aria-label="Ambil foto dari kamera belakang"
+                    disabled={sending || preparingImage || clearingChat}
+                    onChange={handleImageSelection}
+                  />
+                </label>
+                <label className="camera-button front-camera-button" aria-label="Ambil foto dengan kamera depan" title="Kamera depan">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
+                    <circle cx="12" cy="11.5" r="1.5" />
+                    <path d="M9.5 16a2.5 2.5 0 0 1 5 0" />
+                  </svg>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="user"
+                    aria-label="Ambil foto dari kamera depan"
+                    disabled={sending || preparingImage || clearingChat}
+                    onChange={handleImageSelection}
                   />
                 </label>
                 <input
@@ -665,9 +708,9 @@ function App() {
                   maxLength={1000}
                 />
                 <button className="send-button" type="submit" aria-label="Kirim pesan" disabled={sending || preparingImage || clearingChat || (!draft.trim() && !chatImage)}>↑</button>
-              </form>
+              </form>}
             </div>
-            <p className="chat-disclaimer">Pesan disimpan di MongoDB. Percakapan diperbarui otomatis setiap beberapa detik.</p>
+            <p className="chat-disclaimer">{isAdmin ? "Riwayat lengkap ruang chat, kecuali pesan yang telah dihapus." : "Pesan disimpan di MongoDB. Percakapan diperbarui otomatis setiap beberapa detik."}</p>
           </section>
         )}
       </main>

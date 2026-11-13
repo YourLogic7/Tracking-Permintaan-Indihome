@@ -9,7 +9,8 @@ export default api(async (req, res) => {
     res.status(401).json({ error: "Silakan masuk terlebih dahulu." });
     return;
   }
-  if (session.role !== "user" || !ObjectId.isValid(session.userId)) {
+  const isAdmin = session.role === "admin";
+  if (!isAdmin && (session.role !== "user" || !ObjectId.isValid(session.userId))) {
     res.status(403).json({ error: "Akun ini tidak memiliki akses ke ruang chat." });
     return;
   }
@@ -19,13 +20,15 @@ export default api(async (req, res) => {
   }
 
   const { messages, users } = await getCollections();
-  const account = await users.findOne(
-    { _id: new ObjectId(session.userId) },
-    { projection: { _id: 1, authVersion: 1 } },
-  );
-  if (!account || (account.authVersion || 0) !== session.authVersion) {
-    res.status(401).json({ error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
-    return;
+  if (!isAdmin) {
+    const account = await users.findOne(
+      { _id: new ObjectId(session.userId) },
+      { projection: { _id: 1, authVersion: 1 } },
+    );
+    if (!account || (account.authVersion || 0) !== session.authVersion) {
+      res.status(401).json({ error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
+      return;
+    }
   }
 
   const message = await messages.findOne(

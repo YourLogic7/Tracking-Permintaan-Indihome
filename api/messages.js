@@ -4,17 +4,23 @@ import { api, getCollections, getSession, methodNotAllowed, readBody, sendJson }
 export default api(async (req, res) => {
   const session = getSession(req);
   if (!session) return sendJson(res, 401, { error: "Silakan masuk terlebih dahulu." });
-  if (session.role !== "user" || !ObjectId.isValid(session.userId)) {
+  const isAdmin = session.role === "admin";
+  if (isAdmin && req.method !== "GET") {
+    return sendJson(res, 403, { error: "Mode admin hanya dapat melihat ruang chat." });
+  }
+  if (!isAdmin && (session.role !== "user" || !ObjectId.isValid(session.userId))) {
     return sendJson(res, 403, { error: "Akun ini tidak memiliki akses ke ruang chat." });
   }
 
   const { messages, users } = await getCollections();
-  const account = await users.findOne(
-    { _id: new ObjectId(session.userId) },
-    { projection: { _id: 1, authVersion: 1 } },
-  );
-  if (!account || (account.authVersion || 0) !== session.authVersion) {
-    return sendJson(res, 401, { error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
+  if (!isAdmin) {
+    const account = await users.findOne(
+      { _id: new ObjectId(session.userId) },
+      { projection: { _id: 1, authVersion: 1 } },
+    );
+    if (!account || (account.authVersion || 0) !== session.authVersion) {
+      return sendJson(res, 401, { error: "Sesi akun tidak lagi aktif. Silakan masuk kembali." });
+    }
   }
   if (req.method === "DELETE") {
     const { messageId } = readBody(req);
@@ -32,12 +38,12 @@ export default api(async (req, res) => {
   }
 
   if (req.method === "GET") {
-    const recent = await messages
+    const query = messages
       .find({}, { projection: { senderId: 1, username: 1, text: 1, imageType: 1, createdAt: 1, replyTo: 1, readBy: 1 } })
-      .sort({ createdAt: -1, _id: -1 })
-      .limit(50)
-      .toArray();
-    if (recent.length) {
+      .sort({ createdAt: -1, _id: -1 });
+    if (!isAdmin) query.limit(50);
+    const recent = await query.toArray();
+    if (!isAdmin && recent.length) {
       await messages.updateMany(
         {
           _id: { $in: recent.map((message) => message._id) },
