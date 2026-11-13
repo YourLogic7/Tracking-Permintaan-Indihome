@@ -96,12 +96,17 @@ function App() {
   const [draft, setDraft] = useState("");
   const [chatImage, setChatImage] = useState("");
   const [preparingImage, setPreparingImage] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState("environment");
+  const [cameraError, setCameraError] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
   const [sending, setSending] = useState(false);
   const [clearingChat, setClearingChat] = useState(false);
   const [deletingMessageId, setDeletingMessageId] = useState(null);
   const messagesRequestId = useRef(0);
   const dismissedCameraSessionIds = useRef(new Set());
+  const cameraVideoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
   const [accounts, setAccounts] = useState([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [accountPasswords, setAccountPasswords] = useState({});
@@ -115,6 +120,38 @@ function App() {
     document.documentElement.dataset.theme = darkMode ? "dark" : "light";
     localStorage.setItem("theme", darkMode ? "dark" : "light");
   }, [darkMode]);
+
+  useEffect(() => {
+    if (!cameraOpen) return undefined;
+
+    let active = true;
+    setCameraError("");
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Browser ini tidak mendukung akses kamera. Buka aplikasi melalui HTTPS.");
+      return () => {};
+    }
+
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: cameraFacingMode },
+      audio: false,
+    }).then((stream) => {
+      if (!active) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      cameraStreamRef.current = stream;
+      if (cameraVideoRef.current) cameraVideoRef.current.srcObject = stream;
+    }).catch((requestError) => {
+      if (active) setCameraError(requestError.message || "Kamera tidak dapat diakses.");
+    });
+
+    return () => {
+      active = false;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+      if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
+    };
+  }, [cameraOpen, cameraFacingMode]);
 
   useEffect(() => {
     let active = true;
@@ -335,9 +372,7 @@ function App() {
     }
   }
 
-  async function handleImageSelection(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
+  async function processChatImage(file) {
     if (!file) return;
     setPreparingImage(true);
     setChatError("");
@@ -348,6 +383,38 @@ function App() {
     } finally {
       setPreparingImage(false);
     }
+  }
+
+  async function handleImageSelection(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    await processChatImage(file);
+  }
+
+  function captureChatPhoto() {
+    const video = cameraVideoRef.current;
+    if (!video?.videoWidth || !video.videoHeight) {
+      setCameraError("Kamera belum siap. Coba beberapa saat lagi.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      setCameraError("Foto tidak dapat diproses di browser ini.");
+      return;
+    }
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        setCameraError("Foto tidak dapat diambil. Coba lagi.");
+        return;
+      }
+      setCameraOpen(false);
+      await processChatImage(new File([blob], "foto-kamera.jpg", { type: "image/jpeg" }));
+    }, "image/jpeg", 0.92);
   }
 
   async function sendMessage(event) {
@@ -787,35 +854,22 @@ function App() {
                     onChange={handleImageSelection}
                   />
                 </label>
-                <label className="camera-button" aria-label="Ambil foto dengan kamera belakang" title="Kamera belakang">
+                <button
+                  className="camera-button"
+                  type="button"
+                  aria-label="Buka kamera"
+                  title="Buka kamera"
+                  disabled={sending || preparingImage || clearingChat}
+                  onClick={() => {
+                    setCameraFacingMode("environment");
+                    setCameraOpen(true);
+                  }}
+                >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
                     <circle cx="12" cy="13" r="3.5" />
                   </svg>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    aria-label="Ambil foto dari kamera belakang"
-                    disabled={sending || preparingImage || clearingChat}
-                    onChange={handleImageSelection}
-                  />
-                </label>
-                <label className="camera-button front-camera-button" aria-label="Ambil foto dengan kamera depan" title="Kamera depan">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7h3l1.5-2h7L17 7h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1Z" />
-                    <circle cx="12" cy="11.5" r="1.5" />
-                    <path d="M9.5 16a2.5 2.5 0 0 1 5 0" />
-                  </svg>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="user"
-                    aria-label="Ambil foto dari kamera depan"
-                    disabled={sending || preparingImage || clearingChat}
-                    onChange={handleImageSelection}
-                  />
-                </label>
+                </button>
                 <input
                   aria-label="Tulis pesan"
                   placeholder={preparingImage ? "Menyiapkan foto..." : "Tulis pesan..."}
@@ -856,6 +910,33 @@ function App() {
               {loginError && <p className="form-error" role="alert">{loginError}</p>}
               <button className="primary-button modal-submit" type="submit">{authMode === "admin" ? "Masuk admin" : "Masuk ke chat"} <span aria-hidden="true">→</span></button>
             </form>
+          </section>
+        </div>
+      )}
+
+      {cameraOpen && (
+        <div className="modal-backdrop camera-modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setCameraOpen(false);
+        }}>
+          <section className="camera-modal" role="dialog" aria-modal="true" aria-labelledby="camera-title">
+            <div className="camera-modal-heading">
+              <strong id="camera-title">Ambil foto</strong>
+              <button type="button" className="close-button" onClick={() => setCameraOpen(false)} aria-label="Tutup kamera">×</button>
+            </div>
+            <video ref={cameraVideoRef} className="camera-capture-video" autoPlay playsInline muted />
+            {cameraError && <p className="camera-error" role="alert">{cameraError}</p>}
+            <div className="camera-modal-actions">
+              <button
+                type="button"
+                className="camera-stop-button"
+                onClick={() => setCameraFacingMode((mode) => mode === "environment" ? "user" : "environment")}
+              >
+                Ganti ke kamera {cameraFacingMode === "environment" ? "depan" : "belakang"}
+              </button>
+              <button type="button" className="camera-allow-button" disabled={Boolean(cameraError) || preparingImage} onClick={captureChatPhoto}>
+                Ambil foto
+              </button>
+            </div>
           </section>
         </div>
       )}
