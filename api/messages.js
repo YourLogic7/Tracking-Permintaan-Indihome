@@ -5,8 +5,8 @@ export default api(async (req, res) => {
   const session = getSession(req);
   if (!session) return sendJson(res, 401, { error: "Silakan masuk terlebih dahulu." });
   const isAdmin = session.role === "admin";
-  if (isAdmin && req.method !== "GET") {
-    return sendJson(res, 403, { error: "Mode admin hanya dapat melihat ruang chat." });
+  if (isAdmin && !["GET", "POST", "DELETE"].includes(req.method)) {
+    return sendJson(res, 403, { error: "Metode ini tidak diizinkan untuk admin." });
   }
   if (!isAdmin && (session.role !== "user" || !ObjectId.isValid(session.userId))) {
     return sendJson(res, 403, { error: "Akun ini tidak memiliki akses ke ruang chat." });

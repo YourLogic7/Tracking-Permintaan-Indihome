@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import CameraSession from "./CameraSession.jsx";
 
 const MAX_CHAT_IMAGE_BYTES = 1024 * 1024;
 
@@ -89,6 +90,8 @@ function App() {
   const [loginError, setLoginError] = useState("");
   const [user, setUser] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [cameraSessions, setCameraSessions] = useState([]);
+  const [cameraRequestingUserId, setCameraRequestingUserId] = useState("");
   const [chatError, setChatError] = useState("");
   const [draft, setDraft] = useState("");
   const [chatImage, setChatImage] = useState("");
@@ -98,6 +101,7 @@ function App() {
   const [clearingChat, setClearingChat] = useState(false);
   const [deletingMessageId, setDeletingMessageId] = useState(null);
   const messagesRequestId = useRef(0);
+  const dismissedCameraSessionIds = useRef(new Set());
   const [accounts, setAccounts] = useState([]);
   const [accountsLoaded, setAccountsLoaded] = useState(false);
   const [accountPasswords, setAccountPasswords] = useState({});
@@ -178,6 +182,34 @@ function App() {
       if (timer) window.clearInterval(timer);
     };
   }, [page, clearingChat]);
+
+  useEffect(() => {
+    if (page !== "chat" || !user) {
+      setCameraSessions([]);
+      return undefined;
+    }
+
+    let active = true;
+    async function loadCameraSessions() {
+      try {
+        const response = await fetch("/api/camera");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Sesi kamera tidak dapat dimuat.");
+        if (active) {
+          setCameraSessions(data.sessions.filter((cameraSession) => !dismissedCameraSessionIds.current.has(cameraSession.id)));
+        }
+      } catch (requestError) {
+        if (active) setChatError(requestError.message);
+      }
+    }
+
+    loadCameraSessions();
+    const timer = window.setInterval(loadCameraSessions, 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [page, user?.id, user?.role]);
 
   function checkRequest(event) {
     event.preventDefault();
@@ -391,9 +423,41 @@ function App() {
     }
   }
 
+  async function requestCamera(targetUserId) {
+    setCameraRequestingUserId(targetUserId);
+    setChatError("");
+    try {
+      const response = await fetch("/api/camera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request", targetUserId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Permintaan kamera tidak dapat dikirim.");
+      setCameraSessions((current) => [data.session, ...current.filter((item) => item.id !== data.session.id)]);
+    } catch (requestError) {
+      setChatError(requestError.message);
+    } finally {
+      setCameraRequestingUserId("");
+    }
+  }
+
+  function closeCameraSession(sessionId) {
+    dismissedCameraSessionIds.current.add(sessionId);
+    setCameraSessions((current) => current.filter((item) => item.id !== sessionId));
+  }
+
   async function signOut() {
     const isAdmin = user?.role === "admin";
     try {
+      for (const cameraSession of cameraSessions.filter((item) => ["requested", "accepted", "active"].includes(item.status))) {
+        const stopResponse = await fetch("/api/camera", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "stop", sessionId: cameraSession.id }),
+        });
+        if (!stopResponse.ok) throw new Error("Sesi kamera tidak dapat dihentikan. Hentikan kamera terlebih dahulu.");
+      }
       const response = await fetch("/api/auth/logout", { method: "POST" });
       if (!response.ok) throw new Error("Tidak dapat keluar.");
       setUser(null);
@@ -587,22 +651,28 @@ function App() {
               <div><span className="eyebrow"><span className="eyebrow-dot" /> RUANG CHAT</span><h1>{isAdmin ? "Riwayat percakapan" : "Pelaporan Pengaduan"}</h1></div>
               <div className="chat-actions">
                 <span className="demo-badge">BERSAMA</span>
+                <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending || Boolean(deletingMessageId)}>
+                  {clearingChat ? "Menghapus..." : "Hapus riwayat"}
+                </button>
                 {!isAdmin && (
-                  <>
-                    <button className="clear-chat-button" onClick={clearChat} disabled={clearingChat || sending || Boolean(deletingMessageId)}>
-                      {clearingChat ? "Menghapus..." : "Hapus riwayat"}
-                    </button>
-                    <button className="logout-button" onClick={signOut}>Keluar</button>
-                  </>
+                  <button className="logout-button" onClick={signOut}>Keluar</button>
                 )}
               </div>
             </div>
             <div className="chat-panel">
               <div className="chat-contact">
                 <span className="avatar">C</span>
-                <div><strong>Ruang bersama</strong><small>{isAdmin ? "Mode admin · hanya melihat pesan" : `Masuk sebagai ${user?.username}`}</small></div>
+                <div><strong>Ruang bersama</strong><small>{isAdmin ? "Mode admin · dapat mengirim pesan" : `Masuk sebagai ${user?.username}`}</small></div>
                 <span className="online-dot" />
               </div>
+              {cameraSessions.map((cameraSession) => (
+                <CameraSession
+                  key={cameraSession.id}
+                  session={cameraSession}
+                  isAdmin={isAdmin}
+                  onClose={closeCameraSession}
+                />
+              ))}
               <div className="messages" aria-live="polite">
                 {messages.map((message) => (
                   <div key={message.id} className={message.senderId === user?.id ? "message mine" : "message"}>
@@ -641,11 +711,57 @@ function App() {
                         </button>
                       </div>
                     )}
+                    {isAdmin && (
+                      <div className="message-actions">
+                        {message.senderId !== "admin" && (
+                          <>
+                            <button
+                              className="reply-button"
+                              type="button"
+                              onClick={() => setReplyingTo(message)}
+                              disabled={clearingChat || sending || Boolean(deletingMessageId)}
+                            >
+                              Balas
+                            </button>
+                            {(() => {
+                              const existingSession = cameraSessions.find((item) => (
+                                item.targetUserId === message.senderId && ["requested", "accepted", "active"].includes(item.status)
+                              ));
+                              const anotherSessionActive = cameraSessions.some((item) => (
+                                ["requested", "accepted", "active"].includes(item.status)
+                              ));
+                              return (
+                                <button
+                                  className="camera-request-button"
+                                  type="button"
+                                  disabled={Boolean(existingSession) || anotherSessionActive || Boolean(cameraRequestingUserId)}
+                                  onClick={() => requestCamera(message.senderId)}
+                                >
+                                  {cameraRequestingUserId === message.senderId
+                                    ? "Mengirim permintaan..."
+                                    : existingSession
+                                      ? existingSession.status === "requested" ? "Menunggu persetujuan kamera" : "Sesi kamera aktif"
+                                      : "Minta kamera depan"}
+                                </button>
+                                  );
+                            })()}
+                          </>
+                        )}
+                        <button
+                          className="delete-message-button"
+                          type="button"
+                          onClick={() => deleteMessage(message)}
+                          disabled={clearingChat || sending || Boolean(deletingMessageId)}
+                        >
+                          {deletingMessageId === message.id ? "Menghapus..." : "Hapus"}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
               {chatError && <p className="form-error chat-error" role="alert">{chatError}</p>}
-              {!isAdmin && replyingTo && (
+              {replyingTo && (
                 <div className="replying-to">
                   <div>
                     <strong>Membalas {replyingTo.username}</strong>
@@ -654,13 +770,13 @@ function App() {
                   <button type="button" onClick={() => setReplyingTo(null)} aria-label="Batalkan balasan">×</button>
                 </div>
               )}
-              {!isAdmin && chatImage && (
+              {chatImage && (
                 <div className="chat-image-preview">
                   <img src={chatImage} alt="Pratinjau foto yang akan dikirim" />
                   <button type="button" onClick={() => setChatImage("")} aria-label="Hapus foto">×</button>
                 </div>
               )}
-              {!isAdmin && <form className="message-form" onSubmit={sendMessage}>
+              <form className="message-form" onSubmit={sendMessage}>
                 <label className="photo-button" aria-label="Pilih foto">
                   <span aria-hidden="true">＋</span>
                   <input
@@ -708,9 +824,9 @@ function App() {
                   maxLength={1000}
                 />
                 <button className="send-button" type="submit" aria-label="Kirim pesan" disabled={sending || preparingImage || clearingChat || (!draft.trim() && !chatImage)}>↑</button>
-              </form>}
+              </form>
             </div>
-            <p className="chat-disclaimer">{isAdmin ? "Riwayat lengkap ruang chat, kecuali pesan yang telah dihapus." : "Pesan disimpan di MongoDB. Percakapan diperbarui otomatis setiap beberapa detik."}</p>
+            <p className="chat-disclaimer">{isAdmin ? "Admin dapat menghapus satu pesan atau seluruh riwayat chat." : "Pesan disimpan di MongoDB. Percakapan diperbarui otomatis setiap beberapa detik."}</p>
           </section>
         )}
       </main>

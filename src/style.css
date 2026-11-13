@@ -127,6 +127,20 @@ h1, h2, p { margin-top: 0; }
 .chat-contact strong { font-size: 12px; }
 .chat-contact small { margin-top: 4px; color: #8c98aa; font-size: 10px; }
 .online-dot { width: 7px; height: 7px; margin-left: auto; border-radius: 50%; background: #47bc8a; }
+.camera-session { display: grid; gap: 12px; padding: 14px 18px; border-bottom: 1px solid #e8eef6; background: #fffaf3; }
+.camera-session-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.camera-session-heading strong, .camera-session-heading small { display: block; }
+.camera-session-heading strong { color: #34425a; font-size: 12px; }
+.camera-session-heading small { margin-top: 4px; color: #748199; font-size: 10px; }
+.camera-live-badge { flex: none; padding: 5px 7px; border-radius: 12px; color: #a3212c; background: #ffe8ea; font-size: 8px; font-weight: 700; letter-spacing: .4px; }
+.camera-video { display: block; width: min(100%, 480px); max-height: 360px; aspect-ratio: 4 / 3; border-radius: 8px; background: #111820; object-fit: contain; }
+.camera-error { margin: 0; color: #b91f2d; font-size: 11px; }
+.camera-session-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.camera-allow-button, .camera-stop-button, .camera-request-button { padding: 7px 10px; border: 1px solid #dfe6ef; border-radius: 6px; color: #5b687c; background: white; font-size: 10px; font-weight: 600; }
+.camera-allow-button { border-color: #bfe5d6; color: #217450; background: #f2fbf6; }
+.camera-stop-button { border-color: #f2c9cc; color: #b91f2d; background: #fff8f8; }
+.camera-request-button { border: 0; padding: 2px 0; color: var(--accent); background: transparent; }
+.camera-allow-button:disabled, .camera-stop-button:disabled, .camera-request-button:disabled { cursor: not-allowed; opacity: .6; }
 .messages { display: flex; min-height: 250px; max-height: 340px; flex-direction: column; align-items: flex-start; gap: 12px; overflow: auto; padding: 22px; background: #fbfcfe; }
 .message { max-width: 75%; padding: 11px 13px 8px; border: 1px solid #e9eef5; border-radius: 3px 12px 12px; background: #fff; }
 .message.mine { align-self: flex-end; border-color: var(--accent-border); border-radius: 12px 3px 12px 12px; background: var(--accent-soft); }
@@ -238,6 +252,7 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .result-footer strong,
 :root[data-theme="dark"] .message p,
 :root[data-theme="dark"] .chat-contact strong,
+:root[data-theme="dark"] .camera-session-heading strong,
 :root[data-theme="dark"] .account-create-card h2,
 :root[data-theme="dark"] .accounts-card h2,
 :root[data-theme="dark"] .login-modal h2,
@@ -247,6 +262,7 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .phone-icon,
 :root[data-theme="dark"] .privacy-note,
 :root[data-theme="dark"] .chat-contact small,
+:root[data-theme="dark"] .camera-session-heading small,
 :root[data-theme="dark"] .message time,
 :root[data-theme="dark"] .message-read-status,
 :root[data-theme="dark"] .accounts-empty,
@@ -262,6 +278,7 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .input-wrap input::placeholder,
 :root[data-theme="dark"] .message-form input::placeholder { color: #7f8a9b; }
 :root[data-theme="dark"] .chat-contact,
+:root[data-theme="dark"] .camera-session,
 :root[data-theme="dark"] .message-form,
 :root[data-theme="dark"] .account-row,
 :root[data-theme="dark"] footer { border-color: #303945; }
@@ -276,6 +293,11 @@ footer { width: min(1180px, calc(100% - 64px)); display: flex; justify-content: 
 :root[data-theme="dark"] .replying-to { background: #211a1e; border-color: #303945; }
 :root[data-theme="dark"] .replying-to button { color: #aab3c1; }
 :root[data-theme="dark"] .message-author { color: #ff858d; }
+:root[data-theme="dark"] .camera-session { background: #1d2025; }
+:root[data-theme="dark"] .camera-session-heading strong { color: #e7eaf0; }
+:root[data-theme="dark"] .camera-allow-button,
+:root[data-theme="dark"] .camera-stop-button { background: #202731; }
+:root[data-theme="dark"] .camera-live-badge { color: #ff858d; background: #351c21; }
 :root[data-theme="dark"] .account-create-fields input:focus,
 :root[data-theme="dark"] .account-controls input:focus { border-color: var(--accent); outline-color: var(--accent-focus); }
 :root[data-theme="dark"] .small-action { color: #ff858d; background: #281b20; border-color: #503039; }
