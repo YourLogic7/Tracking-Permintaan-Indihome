@@ -15,6 +15,7 @@ function CameraSession({ session, isAdmin, onClose }) {
   const [remoteStream, setRemoteStream] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [connectionStatus, setConnectionStatus] = useState("Menunggu video dari user...");
   const remoteVideoRef = useRef(null);
   const peerRef = useRef(null);
   const streamRef = useRef(null);
@@ -26,7 +27,13 @@ function CameraSession({ session, isAdmin, onClose }) {
   const pendingCandidatesRef = useRef([]);
 
   useEffect(() => {
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+    const video = remoteVideoRef.current;
+    if (!video) return;
+    video.srcObject = remoteStream;
+    if (remoteStream) {
+      video.play().then(() => setConnectionStatus("Video tersambung."))
+        .catch(() => setError("Browser admin tidak dapat memutar video. Coba muat ulang chat."));
+    }
   }, [remoteStream]);
 
   async function sendSignal(type, data) {
@@ -47,10 +54,20 @@ function CameraSession({ session, isAdmin, onClose }) {
     };
     peer.ontrack = (event) => {
       setRemoteStream(event.streams[0] || new MediaStream([event.track]));
+      setConnectionStatus("Stream diterima, menyiapkan video...");
     };
     peer.onconnectionstatechange = () => {
+      if (peer.connectionState === "connected") setConnectionStatus("Koneksi video aktif.");
+      if (peer.connectionState === "disconnected") setConnectionStatus("Koneksi terputus, mencoba menyambung kembali...");
       if (peer.connectionState === "failed") {
-        setError("Koneksi video gagal. Coba minta akses kamera kembali.");
+        setConnectionStatus("Koneksi video gagal.");
+        setError("Koneksi antar-browser gagal. Jaringan ini mungkin memerlukan server TURN.");
+      }
+    };
+    peer.oniceconnectionstatechange = () => {
+      if (peer.iceConnectionState === "failed") {
+        setConnectionStatus("Koneksi jaringan gagal.");
+        setError("Koneksi antar-browser gagal. Jaringan ini mungkin memerlukan server TURN.");
       }
     };
     if (stream) {
@@ -70,7 +87,10 @@ function CameraSession({ session, isAdmin, onClose }) {
       pendingCandidatesRef.current = [];
       const answer = await peer.createAnswer();
       await peer.setLocalDescription(answer);
-      await sendSignal("answer", peer.localDescription);
+      await sendSignal("answer", {
+        type: peer.localDescription.type,
+        sdp: peer.localDescription.sdp,
+      });
     } else if (signal.type === "answer" && isAdmin) {
       await peer.setRemoteDescription(signal.data);
       for (const candidate of pendingCandidatesRef.current) {
@@ -149,7 +169,10 @@ function CameraSession({ session, isAdmin, onClose }) {
       startPolling(peer);
       peer.createOffer()
         .then((offer) => peer.setLocalDescription(offer))
-        .then(() => sendSignal("offer", peer.localDescription))
+        .then(() => sendSignal("offer", {
+          type: peer.localDescription.type,
+          sdp: peer.localDescription.sdp,
+        }))
         .catch((requestError) => {
           setError(requestError.message);
           stopPeer();
@@ -222,8 +245,8 @@ function CameraSession({ session, isAdmin, onClose }) {
           <small>
             {session.status === "requested" && isAdmin && "Menunggu persetujuan user."}
             {session.status === "requested" && !isAdmin && "Admin meminta akses kamera. Kamera belum aktif."}
-            {session.status === "accepted" && "Menghubungkan video..."}
-            {session.status === "active" && "Streaming aktif · hanya terlihat oleh admin."}
+            {["accepted", "active"].includes(session.status) && isAdmin && connectionStatus}
+            {["accepted", "active"].includes(session.status) && !isAdmin && "Kamera aktif dan mengirim video. Hanya admin yang melihat stream."}
             {session.status === "rejected" && "Permintaan ditolak oleh user."}
             {session.status === "ended" && "Sesi kamera telah berakhir."}
           </small>
@@ -235,6 +258,7 @@ function CameraSession({ session, isAdmin, onClose }) {
           ref={remoteVideoRef}
           className="camera-video"
           autoPlay
+          muted
           playsInline
           aria-label={`Video kamera depan ${session.username}`}
         />
