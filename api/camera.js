@@ -1,4 +1,5 @@
 import { ObjectId } from "mongodb";
+import { createHmac } from "node:crypto";
 import { api, getCollections, getSession, methodNotAllowed, readBody, sendJson } from "../lib/server.js";
 
 const ACTIVE_STATUSES = ["requested", "accepted", "active"];
@@ -37,6 +38,56 @@ export default api(async (req, res) => {
   }
 
   if (req.method === "GET") {
+    if (req.query.iceConfig === "1") {
+      const meteredBaseUrl = process.env.METERED_TURN_BASE_URL;
+      const meteredApiKey = process.env.METERED_TURN_API_KEY;
+      if (meteredBaseUrl || meteredApiKey) {
+        if (!meteredBaseUrl || !meteredApiKey) {
+          return sendJson(res, 503, { error: "METERED_TURN_BASE_URL dan METERED_TURN_API_KEY harus diatur bersama." });
+        }
+        const providerUrl = new URL("/api/v1/turn/credentials", meteredBaseUrl);
+        if (providerUrl.protocol !== "https:") {
+          return sendJson(res, 503, { error: "URL layanan TURN harus menggunakan HTTPS." });
+        }
+        providerUrl.searchParams.set("apiKey", meteredApiKey);
+        const providerResponse = await fetch(providerUrl);
+        const providerData = await providerResponse.json();
+        const providerServers = Array.isArray(providerData) ? providerData : providerData?.iceServers;
+        if (!providerResponse.ok || !Array.isArray(providerServers)) {
+          return sendJson(res, 503, { error: "Credential TURN dari Metered tidak dapat dimuat." });
+        }
+        const iceServers = providerServers.filter((server) => (
+          server && (typeof server.urls === "string" || Array.isArray(server.urls))
+        ));
+        if (!iceServers.length || !iceServers.some((server) => (
+          (Array.isArray(server.urls) ? server.urls : [server.urls]).some((url) => /^(turn|turns):/i.test(url))
+        ))) {
+          return sendJson(res, 503, { error: "Metered tidak mengembalikan server TURN yang valid." });
+        }
+        return sendJson(res, 200, { iceServers, turnConfigured: true });
+      }
+
+      const turnUrls = (process.env.TURN_URLS || "")
+        .split(",")
+        .map((url) => url.trim())
+        .filter(Boolean);
+      const turnSecret = process.env.TURN_SHARED_SECRET;
+      if (turnUrls.length && (!turnSecret || turnSecret.length < 16)) {
+        return sendJson(res, 503, { error: "TURN_URLS memerlukan TURN_SHARED_SECRET yang valid." });
+      }
+      if (turnSecret && !turnUrls.length) {
+        return sendJson(res, 503, { error: "TURN_SHARED_SECRET memerlukan TURN_URLS." });
+      }
+
+      const iceServers = [{ urls: "stun:stun.l.google.com:19302" }];
+      if (turnUrls.length && turnSecret) {
+        const username = `${Math.floor(Date.now() / 1000) + 3600}:chat`;
+        const credential = createHmac("sha1", turnSecret).update(username).digest("base64");
+        iceServers.push({ urls: turnUrls, username, credential });
+      }
+      return sendJson(res, 200, { iceServers, turnConfigured: turnUrls.length > 0 });
+    }
+
     const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
     if (sessionId) {
       if (!ObjectId.isValid(sessionId)) return sendJson(res, 400, { error: "Sesi kamera tidak valid." });

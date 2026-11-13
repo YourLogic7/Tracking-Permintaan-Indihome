@@ -25,6 +25,7 @@ function CameraSession({ session, isAdmin, onClose }) {
   const cursorRef = useRef("");
   const stoppedRef = useRef(false);
   const pendingCandidatesRef = useRef([]);
+  const turnConfiguredRef = useRef(false);
 
   useEffect(() => {
     const video = remoteVideoRef.current;
@@ -40,9 +41,14 @@ function CameraSession({ session, isAdmin, onClose }) {
     await postCamera({ action: "signal", sessionId: session.id, type, data });
   }
 
-  function createPeer(stream) {
+  async function createPeer(stream) {
+    const configResponse = await fetch("/api/camera?iceConfig=1");
+    const config = await configResponse.json();
+    if (!configResponse.ok) throw new Error(config.error || "Konfigurasi koneksi video tidak dapat dimuat.");
+    if (stoppedRef.current) throw new Error("Sesi kamera telah dihentikan.");
+    turnConfiguredRef.current = config.turnConfigured;
     const peer = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+      iceServers: config.iceServers,
     });
     peerRef.current = peer;
     peer.onicecandidate = (event) => {
@@ -61,13 +67,13 @@ function CameraSession({ session, isAdmin, onClose }) {
       if (peer.connectionState === "disconnected") setConnectionStatus("Koneksi terputus, mencoba menyambung kembali...");
       if (peer.connectionState === "failed") {
         setConnectionStatus("Koneksi video gagal.");
-        setError("Koneksi antar-browser gagal. Jaringan ini mungkin memerlukan server TURN.");
+        setError(iceFailureMessage());
       }
     };
     peer.oniceconnectionstatechange = () => {
       if (peer.iceConnectionState === "failed") {
         setConnectionStatus("Koneksi jaringan gagal.");
-        setError("Koneksi antar-browser gagal. Jaringan ini mungkin memerlukan server TURN.");
+        setError(iceFailureMessage());
       }
     };
     if (stream) {
@@ -76,6 +82,12 @@ function CameraSession({ session, isAdmin, onClose }) {
       peer.addTransceiver("video", { direction: "recvonly" });
     }
     return peer;
+  }
+
+  function iceFailureMessage() {
+    return turnConfiguredRef.current
+      ? "Koneksi tetap gagal meski TURN aktif. Periksa alamat dan kredensial layanan TURN."
+      : "Koneksi gagal dan TURN belum dikonfigurasi. Atur kredensial coturn atau Metered Open Relay.";
   }
 
   async function handleSignal(signal, peer) {
@@ -165,17 +177,26 @@ function CameraSession({ session, isAdmin, onClose }) {
     stoppedRef.current = false;
     try {
       if (!window.RTCPeerConnection) throw new Error("Browser ini tidak mendukung video real-time.");
-      const peer = createPeer(null);
-      startPolling(peer);
-      peer.createOffer()
-        .then((offer) => peer.setLocalDescription(offer))
-        .then(() => sendSignal("offer", {
-          type: peer.localDescription.type,
-          sdp: peer.localDescription.sdp,
-        }))
+      createPeer(null)
+        .then((peer) => {
+          if (stoppedRef.current) {
+            peer.close();
+            return;
+          }
+          startPolling(peer);
+          return peer.createOffer()
+            .then((offer) => peer.setLocalDescription(offer))
+            .then(() => sendSignal("offer", {
+              type: peer.localDescription.type,
+              sdp: peer.localDescription.sdp,
+            }));
+        })
         .catch((requestError) => {
-          setError(requestError.message);
-          stopPeer();
+          if (!stoppedRef.current) {
+            setError(requestError.message);
+            stopPeer();
+            postCamera({ action: "stop", sessionId: session.id }).catch(() => {});
+          }
         });
     } catch (requestError) {
       setError(requestError.message);
@@ -206,7 +227,7 @@ function CameraSession({ session, isAdmin, onClose }) {
       await postCamera({ action: "accept", sessionId: session.id });
       stoppedRef.current = false;
       streamRef.current = stream;
-      const peer = createPeer(stream);
+      const peer = await createPeer(stream);
       startPolling(peer);
     } catch (requestError) {
       stream?.getTracks().forEach((track) => track.stop());
